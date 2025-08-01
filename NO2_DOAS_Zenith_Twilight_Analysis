@@ -1,0 +1,511 @@
+ import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import glob
+get_ipython().run_line_magic('matplotlib', 'inline')
+ln[2] import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import glob
+
+# === File paths ===
+file_path1 = glob.glob(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\no2cell\*.DAT')
+file_path2 = glob.glob(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\withoutcell\*.DAT')
+dark_file = r'C:\Users\samar\OneDrive\Desktop\dark.DAT'
+
+# === Load dark measurement ===
+Dark_measurement = np.loadtxt(dark_file, comments='*')
+
+# === Example: Use the first file for demonstration ===
+I_file = file_path1[0]
+I0_file = file_path2[0]
+
+I = np.loadtxt(I_file, comments='*')
+I0 = np.loadtxt(I0_file, comments='*')
+
+# === Subtract dark and ensure positive intensities ===
+I_final = I - Dark_measurement
+I0_final = I0 - Dark_measurement
+
+# Clip negative values to zero (or a small positive value)
+I_final = np.clip(I_final, 1e-10, None)
+I0_final = np.clip(I0_final, 1e-10, None)
+
+24
+
+I_data = pd.DataFrame(I_final)
+I0_data = pd.DataFrame(I0_final)
+
+# === Wavelength calibration ===
+a0 = 429.494
+a1 = 93.112
+a2 = -6.050
+N = 1024
+wavelengths = [a0 + a1 * ((i - 1) / (N - 1)) + a2 * ((i - 1) / (N - 1)) ** 2 for i in range(N)]
+I_data.insert(0, "wavelength", wavelengths)
+I_data.insert(0, "I0", I0_data[1])
+
+# === Filter wavelength range ===
+I_data = I_data[(I_data.wavelength >= 432.5) & (I_data.wavelength <= 465)]
+
+# === Plotting ===
+fig1, ax1 = plt.subplots()
+ax1.plot(I_data['wavelength'], I_data[1])
+ax1.plot(I_data['wavelength'], I_data['I0'])
+ax1.legend(['Intensity with NO$_2$ cell', 'Intensity without NO$_2$ cell'])
+ax1.set(xlabel='Wavelength (nm)', ylabel='Intensity without dark current')
+plt.show()
+ln[8]
+print(I_data)
+
+# In[9]:
+
+# to calculate optical path
+import math
+
+ln[10]
+
+25
+opticaldepth=abs(I_data['I0']/I_data[1])
+depth=pd.DataFrame(opticaldepth)
+jin1=[]
+for j in depth[0]:
+jin=math.log(j)
+jin1.append(jin)
+jin11=pd.DataFrame(jin1)
+
+ln[72] #calculate differential optical depth #jin11# Log of io/i
+x=I_data['wavelength']
+fitpolynomial =np.polyfit(x,jin11,3)
+fitted_polynomial=np.polyval(fitpolynomial,x)
+l=pd.DataFrame (fitted_polynomial)
+differential=jin11-l
+
+#subtract from ini/ie to get differential ini/io
+plt.plot(np.array(x),np.array(differential), 'r')
+plt.plot(np.array(x),np.array(jin11),'g')
+fitpolynomial
+
+ln[73] print(differential.min(),differential.min())
+
+ln[74]
+plt.plot(np.array(x),np.array(differential),'r')
+plt.plot(np.array(x),np.array(jin11),'g')
+ba=['differential optical depth','lnI/I0']
+plt.legend(ba)
+plt.ylabel('Differential optical depth of second Measurment pair')
+plt.xlabel('wavelength(nm)')
+
+ln[75] #for cross section
+from scipy.interpolate import interp1d
+
+26
+
+crosssection=np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\DAT
+FILE\diffxcross.DAT',comments='*',encoding='latin1')
+H=pd.DataFrame(crosssection)
+print(H)
+H=H[H[0]<=465]
+H=H[H[0]>=432.5]
+X=np.array(H[0])
+Y=np.array(H[1])
+f=interp1d(X,Y)
+f2=interp1d(X,Y)
+xnew=np.linspace(432.5,465,num=400,endpoint=True)
+plt.plot(X,f(X),'-')
+plt.scatter(X,Y)
+plt.title('Differential Cross section Interpolation')
+plt.ylabel('Diffrential Cross section.(cm)^2')
+plt.xlabel('Wavelength(nm)')
+
+ln[76] #linear regression to get slant colomun
+from scipy import stats
+print(H)
+#H.insert(2,"diffrential",diffrential,True)
+xdata=f(x)
+xdata1=np.array(xdata*(1000000000000000000))
+ydata=np.array(differential[0])
+x0=[1,1]
+
+ln[77] import uncertainties.unumpy as unumpy
+from uncertainties import ufloat
+from uncertainties.umath import *
+#analysis of NO2 concentration
+import numpy as np
+import pandas as pd
+
+27
+import scipy.optimize as optimization
+from scipy import linalg
+from scipy import stats
+from scipy.optimize import curve_fit
+from scipy.interpolate import interp1d
+import glob
+import matplotlib.pyplot as plt
+import math
+import os
+import uncertainties.unumpy as unumpy
+from uncertainties import ufloat
+from uncertainties.umath import *
+ln[78] import numpy as np
+import pandas as pd
+import glob
+from scipy import stats
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+# File paths
+filepath1 = glob.glob(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\no2cell\*.DAT')
+filepath2 = glob.glob(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\withoutcell\*.DAT')
+dark_file = r'C:\Users\samar\OneDrive\Desktop\dark.DAT'
+cross_section_file = r'C:\Users\samar\OneDrive\Desktop\DAT FILE\diffxcross.DAT'
+
+# Sort file lists
+sortedfilepath1 = sorted(filepath1)
+sortedfilepath2 = sorted(filepath2)
+def exp_decay(x, a, b, c):
+return a * np.exp(-b * x) + c
+no2_values, times = no2_concentration()
+
+28
+
+# Prepare storage
+no2con = np.zeros(len(sortedfilepath1))
+time = np.zeros(len(sortedfilepath1))
+def no2_concentration():
+dark_current = np.loadtxt(dark_file, comments='*')
+
+for idx in range(len(sortedfilepath1)):
+I_data = np.loadtxt(sortedfilepath1[idx], comments='*') - dark_current
+I0_data = np.loadtxt(sortedfilepath2[idx], comments='*') - dark_current
+
+I = pd.DataFrame(I_data)
+I0 = pd.DataFrame(I0_data)
+
+# Wavelength calibration
+N = 1024
+a0, a1, a2 = 429.494, 93.112, -6.050
+wavelength = np.array([a0 + a1*((i)/(N-1)) + a2*((i)/(N-1))**2 for i in range(N)])
+wavelength = pd.Series(wavelength)
+
+# Merge into one DataFrame
+df = pd.DataFrame({
+'wavelength': wavelength,
+'I': I.iloc[:,1],
+'I0': I0.iloc[:,1]
+})
+
+# Filter wavelength range
+df = df[(df['wavelength'] >= 432.5) & (df['wavelength'] <= 465)].reset_index(drop=True)
+
+# Optical depth and differential optical depth
+ln_I0_I = np.log(df['I0'] / df['I'])
+
+29
+poly_fit = np.polyfit(df['wavelength'], ln_I0_I, 3)
+baseline = np.polyval(poly_fit, df['wavelength'])
+diff_OD = ln_I0_I - baseline
+
+# Load cross section and interpolate
+cross = np.loadtxt(cross_section_file, comments='*', encoding='latin1')
+cross_df = pd.DataFrame(cross, columns=['wavelength', 'xs'])
+cross_df = cross_df[(cross_df['wavelength'] >= 432.5) & (cross_df['wavelength'] <=
+465)].reset_index(drop=True)
+
+interp_func = interp1d(cross_df['wavelength'], cross_df['xs'], kind='linear')
+interpolated_xs = interp_func(df['wavelength']) * 1e16 # Convert units
+
+# Linear regression
+slope, intercept, r_value, p_value, std_err = stats.linregress(interpolated_xs, diff_OD)
+no2_slant_column = slope * 1e16
+no2con[idx] = no2_slant_column / 10 # Cell height in cm or mm?
+time[idx] = idx # or use timestamp if available
+
+return no2con, time
+
+# ...existing code...
+
+no2_values, times = no2_concentration()
+# Scatter plot of data (dots only, no exponential fit)
+plt.scatter(times, no2_values, color='black', s=15, label='Data')
+
+plt.xlabel("Time")
+plt.ylabel("NO2 Concentration in Cell")
+plt.title("NO2 concentration in the cell [in molec/cm3] wrt time")
+plt.legend()
+plt.grid(True)
+
+30
+
+plt.show()
+ln[79] #Horizon analysis for the 2nd data set
+I_data=np.loadtxt (r'C:\Users\samar\OneDrive\Desktop\DAT
+FILE\horizon90\h01.DAT',comments='*')
+#al-sorted(file_path1)
+dark_current_Hori=np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\dark.DAT',
+comments='*')
+Idata_withoutdark=I_data-dark_current_Hori
+I=pd.DataFrame(Idata_withoutdark)
+I0_DATA=np.loadtxt (r'C:\Users\samar\OneDrive\Desktop\DAT FILE\horizon90\h90.DAT',
+comments='*')
+dark_current_Hori=np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\dark.DAT',
+comments='*')
+I0data_withoutdark=I0_DATA-dark_current_Hori
+I0=pd.DataFrame(I0data_withoutdark)
+a11=[ ]
+for i in range(1024):
+a0=429.494
+a1=93.112
+a2=-6.050
+N=1024
+Lambda=a0+a1*((i-1)/(N-1))+a2* ((i-1)/(N-1))* ((i-1)/(N-1))
+a11.append(Lambda)
+Wavelength=pd.DataFrame(a11)
+I0.insert(0, "wavelength", Wavelength[0], True)
+I0.insert(0, "I", I[1], True)
+I0=I0[I0.wavelength<=465]
+I0=I0[I0.wavelength>=432.5]
+I0.reset_index(drop=True, inplace=True)
+#calculation of Ln(IO/I)
+opticaldepth=abs(I0[1]/I0['I'])
+depth=pd.DataFrame(opticaldepth)
+depthvalue=np.log(depth)
+
+31
+
+ln_I0_I=pd.DataFrame(depthvalue)
+#calculate differential optical depth
+x=I0['wavelength']
+fitapolynomial=np.polyfit(x, ln_I0_I, 3)
+fittedpolynomial=np.polyval (fitapolynomial, x)
+fittedpolynomial_df=pd.DataFrame (fittedpolynomial)
+diff=ln_I0_I-fittedpolynomial_df #subtracting fittedpolynomial from Ln ie/i to get differential
+in ie/i
+crosssection=np.loadtxt (r'C:\Users\samar\OneDrive\Desktop\DAT FILE\diffxcross.DAT',
+comments='*', encoding='latin')
+H=pd.DataFrame (crosssection)
+H_Dup=pd.DataFrame(crosssection)
+H=H[H[0]<=465]
+H=H[H[0]>=432.5]
+H.reset_index(drop=True, inplace=True)
+X=np.array(H[0])
+Y=np.array(H[1])
+f=interp1d(X, Y)
+
+# Linear regression to get saint clomun
+H.insert(2, "differential", diff[0], True)
+xdata = f(x) #take differential absorption cross-section
+xdata1=-np.array(xdata)
+ydata=np.array(diff[0])
+x0=[1,1]
+A = np.vstack ([xdata1, np.ones (len(xdata))]).T
+m, c,r_value, p_value, std_err= stats.linregress (xdata1, ydata)
+y1=m*xdata1+c
+no2slantcolumn=m
+no2concentration=abs (no2slantcolumn/10)
+no2con=no2concentration
+print (no2slantcolumn)
+ln[80] import numpy as np
+
+32
+
+import pandas as pd
+from scipy.interpolate import interp1d
+from scipy import stats
+
+def no2_concentration():
+# Horizon analysis for the 2nd data set
+I_data = np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\horizon90\h01.DAT',
+comments='*')
+dark_current_Hori = np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\dark.DAT',
+comments='*')
+Idata_withoutdark = I_data - dark_current_Hori
+I = pd.DataFrame(Idata_withoutdark)
+
+I0_DATA = np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\DAT
+FILE\horizon90\h90.DAT', comments='*')
+dark_current_Hori = np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\dark.DAT',
+comments='*')
+Idata_withoutdark = I0_DATA - dark_current_Hori
+I0 = pd.DataFrame(Idata_withoutdark)
+
+a0 = 429.494
+a1 = 93.112
+a2 = -6.050
+N = 1024
+
+a11 = []
+for i in range(N):
+Lambda = a0 + a1 * ((i - 1) / (N - 1)) + a2 * ((i - 1) / (N - 1)) * ((i - 1) / (N - 1))
+a11.append(Lambda)
+
+Wavelength = pd.DataFrame(a11)
+I0.insert(0, "wavelength", Wavelength[0], True)
+I0.insert(0, "I", I[1], True)
+
+33
+
+I0 = I0[I0['wavelength'] <= 465]
+I0 = I0[I0['wavelength'] >= 432.5]
+I0.reset_index(drop=True, inplace=True)
+
+# Calculation of Ln(IO/I)
+optical_depth = np.abs(I0[1] / I0['I'])
+depth = pd.DataFrame(optical_depth)
+depth_value = np.log(depth)
+ln_I0_I = pd.DataFrame(depthvalue)
+
+# Calculate differential optical depth
+x = I0['wavelength']
+fitapolynomial = np.polyfit(x, ln_I0_I, 3)
+fittedpolynomial = np.polyval(fitpolynomial, x)
+fittedpolynomial_df = pd.DataFrame(fittedpolynomial)
+diff=ln_I0_I - fittedpolynomial_df # subtracting fitted polynomial from Ln(Ie/I) to get
+differential in Ie/I
+
+# Interpolation for differential absorption cross-section
+crosssection = np.loadtxt(r'C:\Users\samar\OneDrive\Desktop\DAT FILE\diffxcross.DAT',
+comments='*', encoding='latin')
+H = pd.DataFrame(crosssection)
+H_Dup = pd.DataFrame(crosssection)
+H = H[H[0] <= 465]
+H = H[H[0] >= 432.5]
+H.reset_index(drop=True, inplace=True)
+X = np.array(H[0])
+Y = np.array(H[1])
+f = interp1d(X, Y)
+
+# Linear regression to get slant column
+H.insert(2, "differential", diff[0], True)
+
+34
+xdata = f(x) # take differential absorption cross-section
+xdata = np.array(xdata)
+ydata = np.array(diff[0])
+x0 = [1, 1]
+A = np.vstack([xdata, np.ones(len(xdata))]).T
+m, c, r_value, p_value, std_err = stats.linregress(xdata1, ydata)
+y1 = m * xdata + c
+no2slantcolumn = m
+no2concentration = abs(no2slantcolumn / 10)
+no2con = no2concentration
+print(no2slant_column)
+ln[82] plt.figure(22)
+plt.plot(I0['wavelength'],I0[1])
+plt.plot(I0['wavelength'],I0['I'])
+plt.title('Intensity at zenith and Intensity at 1° horizon angle')
+plt.legend(['Intensity at zenith', 'Intensity at 1° horizon angle'])
+plt.ylabel('Intensity without dark current')
+plt.xlabel('Wavelength [nm]')
+plt.savefig('figure(22).png')
+
+plt.figure(23)
+plt.plot(I0['wavelength'],ln_I0_I[0])
+plt.plot(I0['wavelength'],diff[0])
+plt.title('ln (10/1) and Differential Optical Density vs wavelength')
+plt.legend(['ln (10/1) vs wavelength', 'differential optical density vs wavelength'])
+plt.ylabel('Optical density')
+plt.xlabel('Wavelength [nm]')
+plt.savefig('figure(23).png')
+
+plt.figure(24)
+plt.plot(x,f(x), '-')
+plt.scatter(X, Y)
+
+35
+plt.title('Differential Cross-section Interpolation')
+plt.ylabel('Differential Cross-section [cm2/molec]')
+plt.xlabel('Wavelength [nm]')
+plt.savefig('figure(24).png')
+
+plt.figure(25)
+plt.scatter(xdata1, ydata)
+plt.plot(xdata1, y1, 'r')
+plt.axis([-1.5e-19, 2.5e-19, -0.02, 0.02])
+plt.title('NO2 Slant Column')
+plt.ylabel('Differential Optical Depth')
+plt.xlabel('NO2 Differential Cross-section [cm2/molec]')
+plt.savefig('figure(25).png')
+
+ln[83] # Example: slant_column = A / (angle + B)
+A = 4e16
+B = 1 # To avoid division by zero
+
+elevation_angles = np.array(list(range(1, 16)) + [30])
+slant_columns = A / (elevation_angles + B)
+errors = slant_columns * 0.05 # 5% error for illustration
+
+plt.figure(figsize=(8, 5))
+plt.errorbar(
+elevation_angles, slant_columns, yerr=errors,
+fmt='o', markersize=4,
+color='blue', ecolor='pink', elinewidth=1, capsize=2
+)
+plt.title('NO2 Slant columns to that of the angles')
+plt.xlabel('Horizon Angle [°]')
+plt.ylabel('NO2 Slant column [molec/cm^2]')
+plt.ylim(0, 4.5e16)
+
+36
+
+plt.xlim(0, 16)
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("NO2_SlantColumn_vs_HorizonAngle.png", dpi=300)
+plt.show()
+ln[84] import scipy
+#no2 VC above bremen
+sc = np.loadtxt (r'C:\Users\samar\OneDrive\Desktop\lab
+2\SC\NO2_SC_Bremen_20220205.DAT', comments='*', encoding='latin')
+df_sc = pd.DataFrame(sc)
+df_sc.columns = ['Time', 'SZA', 'SC', 'SC uncert']
+amf=np.loadtxt (r'C:\Users\samar\Downloads\NO2_AMF.DAT', comments='*',
+encoding='latin')
+df_amf = pd.DataFrame(amf)
+df_amf.columns = ['SZA', 'AMF']
+amf_int =scipy.interpolate. interp1d(df_amf['SZA'], df_amf['AMF'])
+c = []
+df_sc['AMF'] = amf_int (df_sc['SZA'])
+c = amf_int (69)
+df_sc["Delta_AMF"] = df_sc["AMF"] - c
+df_sc["Delta_VC"] = df_sc[ 'SC'] / df_sc["Delta_AMF"]
+error_percentage=(df_sc['SC uncert'] * df_sc['Delta_VC'])
+df_sc["Error_SC"] = abs(error_percentage/100)
+
+df_sunrise =df_sc
+df_sunrise = df_sunrise [df_sunrise[ 'Time'] >= 5]
+df_sunrise = df_sunrise [df_sunrise['Time'] <= 10]
+
+df_sunset = df_sc
+df_sunset = df_sunset [df_sunset['Time'] >= 15]
+df_sunset = df_sunset [df_sunset['Time'] <= 20]
+plt.figure(99)
+plt.scatter (df_sc['Time'], df_sc['Delta_VC'], color='red')
+
+37
+plt.plot(df_sc['Time'], df_sc['Delta_VC'], color='y')
+plt.xlabel('Time')
+plt.ylabel('Vertical Column')
+plt.title('NO2 Vertical Column above Bremen')
+plt.show()
+plt.savefig('figure (99).png', dpi=300)
+
+plt.figure(100)
+plt.scatter (df_sunset ['Time'], df_sunset [ 'Delta_VC'], color='red')
+plt.plot(df_sunset['Time'], df_sunset [ 'Delta_VC'], color='y')
+plt.xlabel('Time')
+plt.ylabel('Vertical Column')
+plt.title('NO2 Vertical Column above Bremen during Sunset', y = 1.08)
+plt.show()
+plt.savefig('figure (100).png', dpi=300)
+
+plt.figure(101)
+plt.scatter (df_sunrise [ 'Time'], df_sunrise [ 'Delta_VC'], color='red')
+plt.plot(df_sunrise['Time'], df_sunrise [ 'Delta_VC'], color = 'y')
+plt.xlabel('Time')
+plt.ylabel('Vertical Column')
+plt.title('NO2 Vertical Column above Bremen during Sunrise', y = 1.08)
+plt.show()
+plt.savefig('figure (101).png', dpi=300)
+df_sc
